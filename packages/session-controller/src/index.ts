@@ -17,6 +17,7 @@ export interface RuntimeEndpointOptions {
     runtimeVersion: string;
     capabilities?: string[];
     handshakeTimeoutMs?: number;
+    token?: string;
 }
 
 export interface RuntimeEndpoint {
@@ -54,8 +55,7 @@ export async function createRuntimeEndpoint(options: RuntimeEndpointOptions): Pr
                 type: 'error',
                 code: 'SESSION_BUSY',
                 message: 'A runtime is already connected',
-            }) + '
-');
+            }) + '\n');
             return;
         }
 
@@ -67,8 +67,7 @@ export async function createRuntimeEndpoint(options: RuntimeEndpointOptions): Pr
 
         const reject = (code: string, message: string): void => {
             const response: RuntimeResponse = { type: 'error', code, message };
-            socket.end(JSON.stringify(response) + '
-');
+            socket.end(JSON.stringify(response) + '\n');
         };
 
         socket.on('timeout', () => {
@@ -80,14 +79,12 @@ export async function createRuntimeEndpoint(options: RuntimeEndpointOptions): Pr
 
         socket.on('data', (chunk: string) => {
             input += chunk;
-            if (Buffer.byteLength(input, 'utf8') > 16 * 1024 && !input.includes('
-')) {
+            if (Buffer.byteLength(input, 'utf8') > 16 * 1024 && !input.includes('\n')) {
                 reject('MESSAGE_TOO_LARGE', 'Runtime message exceeds 16 KiB');
                 return;
             }
 
-            let newline = input.indexOf('
-');
+            let newline = input.indexOf('\n');
             while (newline >= 0) {
                 const line = input.slice(0, newline);
                 input = input.slice(newline + 1);
@@ -131,8 +128,7 @@ export async function createRuntimeEndpoint(options: RuntimeEndpointOptions): Pr
                         runtimeVersion: options.runtimeVersion,
                         capabilities: options.capabilities ?? [],
                     };
-                    socket.write(JSON.stringify(response) + '
-');
+                    socket.write(JSON.stringify(response) + '\n');
                 } else {
                     const event = message as RuntimeEvent;
                     if (!event || (event.type !== 'pong' && event.type !== 'stageSnapshot' && event.type !== 'error')) {
@@ -141,8 +137,7 @@ export async function createRuntimeEndpoint(options: RuntimeEndpointOptions): Pr
                     }
                     for (const listener of messageListeners) listener(event);
                 }
-                newline = input.indexOf('
-');
+                newline = input.indexOf('\n');
             }
         });
 
@@ -174,8 +169,7 @@ export async function createRuntimeEndpoint(options: RuntimeEndpointOptions): Pr
                 throw new Error('No authenticated GJS runtime is connected');
             if (command.type !== 'ping' && command.type !== 'shutdown' && command.type !== 'inspectStage')
                 throw new TypeError('Unsupported runtime command');
-            activeSocket.write(JSON.stringify(command) + '
-');
+            activeSocket.write(JSON.stringify(command) + '\n');
         },
         onMessage(listener) {
             messageListeners.add(listener);
