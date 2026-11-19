@@ -4,24 +4,56 @@
   "description": "Read-only GNOME Shell Clutter stage inspector for G-Os Debugger",
   "version": "0.1.0",
   "publisher": "g-os-debug",
-  "engines": { "vscode": "^1.95.0" },
-  "categories": ["Debuggers", "Other"],
-  "activationEvents": ["onStartupFinished"],
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "Debuggers",
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "views": {
-      "debug": [{ "id": "gOsActors", "name": "GNOME Shell Actors" }]
+      "debug": [
+        {
+          "id": "gOsActors",
+          "name": "GNOME Shell Actors"
+        }
+      ]
     },
     "commands": [
-      { "command": "gOsDebug.startInspector", "title": "G-Os: Start GNOME Shell Inspector" },
-      { "command": "gOsDebug.refreshActors", "title": "G-Os: Refresh Actor Tree" },
-      { "command": "gOsDebug.stopInspector", "title": "G-Os: Stop Inspector" },
-      { "command": "gOsDebug.configureRuntimeToken", "title": "G-Os: Configure Runtime Token" }
+      {
+        "command": "gOsDebug.startInspector",
+        "title": "G-Os: Start GNOME Shell Inspector"
+      },
+      {
+        "command": "gOsDebug.refreshActors",
+        "title": "G-Os: Refresh Actor Tree"
+      },
+      {
+        "command": "gOsDebug.stopInspector",
+        "title": "G-Os: Stop Inspector"
+      },
+      {
+        "command": "gOsDebug.configureRuntimeToken",
+        "title": "G-Os: Configure Runtime Token"
+      }
     ],
     "menus": {
       "view/title": [
-        { "command": "gOsDebug.refreshActors", "when": "view == gOsActors", "group": "navigation" },
-        { "command": "gOsDebug.stopInspector", "when": "view == gOsActors", "group": "navigation" }
+        {
+          "command": "gOsDebug.refreshActors",
+          "when": "view == gOsActors",
+          "group": "navigation"
+        },
+        {
+          "command": "gOsDebug.stopInspector",
+          "when": "view == gOsActors",
+          "group": "navigation"
+        }
       ]
     },
     "configuration": {
@@ -40,7 +72,13 @@
       }
     }
   },
-  "scripts": { "build": "tsc -p tsconfig.json" },
-  "dependencies": { "@g-os-debug/session-controller": "0.2.0" },
-  "devDependencies": { "@types/vscode": "^1.95.0" }
+  "scripts": {
+    "build": "esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=dist/extension.js"
+  },
+  "dependencies": {
+    "@g-os-debug/session-controller": "0.2.0"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.95.0"
+  }
 }

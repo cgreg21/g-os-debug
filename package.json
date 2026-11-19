@@ -3,7 +3,9 @@
   "version": "0.3.0",
   "private": true,
   "type": "module",
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "build": "npm run build --workspace @g-os-debug/protocol && npm run build --workspace @g-os-debug/source-maps && npm run build --workspace @g-os-debug/session-controller && npm run build --workspace @g-os-debug/debug-adapter && npm run build --workspace @g-os-debug/vscode-extension && npm run check:runtime",
     "test": "npm run build && node --test tests/*.test.mjs",
@@ -14,6 +16,7 @@
   "devDependencies": {
     "@types/node": "^22.10.0",
     "@types/vscode": "^1.95.0",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "esbuild": "^0.28.2"
   }
 }
