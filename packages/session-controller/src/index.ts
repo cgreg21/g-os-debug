@@ -11,12 +11,6 @@ export interface RuntimeEndpointOptions {
     handshakeTimeoutMs?: number;
 }
 
-export interface ConnectedRuntime {
-    socket: Socket;
-    runtimeVersion: string;
-    capabilities: string[];
-}
-
 export interface RuntimeEndpoint {
     readonly token: string;
     readonly socketPath: string;
@@ -30,12 +24,13 @@ export async function createRuntimeEndpoint(options: RuntimeEndpointOptions): Pr
     await mkdir(dirname(options.socketPath), { recursive: true, mode: 0o700 });
     await rm(options.socketPath, { force: true });
 
-    let connected = false;
+    let activeSocket: Socket | undefined;
     const server = createServer((socket) => {
-        if (connected) {
+        if (activeSocket) {
             socket.end(JSON.stringify({ type: 'error', code: 'SESSION_BUSY', message: 'A runtime is already connected' }) + '\n');
             return;
         }
+        activeSocket = socket;
         socket.setEncoding('utf8');
         socket.setTimeout(options.handshakeTimeoutMs ?? 5000);
         let input = '';
@@ -73,7 +68,6 @@ export async function createRuntimeEndpoint(options: RuntimeEndpointOptions): Pr
                 reject('PROTOCOL_MISMATCH', 'Runtime protocol version is not supported');
                 return;
             }
-            connected = true;
             socket.setTimeout(0);
             const response: RuntimeResponse = {
                 type: 'hello',
@@ -82,6 +76,9 @@ export async function createRuntimeEndpoint(options: RuntimeEndpointOptions): Pr
                 capabilities: options.capabilities ?? [],
             };
             socket.write(JSON.stringify(response) + '\n');
+        });
+        socket.on('close', () => {
+            if (activeSocket === socket) activeSocket = undefined;
         });
         socket.on('error', () => undefined);
     });
@@ -100,7 +97,7 @@ export async function createRuntimeEndpoint(options: RuntimeEndpointOptions): Pr
         socketPath: options.socketPath,
         server,
         close: async () => {
-            for (const socket of server.listening ? (server as Server & { _connections?: number })._connections ? [] : [] : []) socket.destroy();
+            activeSocket?.destroy();
             await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
             await rm(options.socketPath, { force: true });
         },
