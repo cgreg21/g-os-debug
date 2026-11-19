@@ -7,10 +7,9 @@ A debugging toolchain for GNOME Shell extensions, designed around DAP, GJS and V
 ## Architecture
 
 ```text
-VS Code ── DAP/stdio ── Debug Adapter ── private Unix socket ── GJS runtime
-                                                                  │
-                                                           GNOME Shell context
-Session Controller ── owns socket, token and runtime handshake
+VS Code ── DAP/stdio ── Debug Adapter ── Debug Session ── private Unix socket ── GJS runtime
+                                                                                  │
+                                                                           GNOME Shell context
 Source Map Service ── maps generated JavaScript to TypeScript
 GNOME Inspector ───── read-only Clutter stage snapshots
 ```
@@ -22,9 +21,13 @@ A separate GJS process cannot inspect the JavaScript heap or execution context o
 - `protocol`: versioned private runtime contract, actor snapshot types and DAP framing.
 - `debug-adapter`: DAP stdio endpoint.
 - `source-maps`: JavaScript/TypeScript source mapping.
-- `session-controller`: private Unix socket, random per-session token, protocol handshake, socket permissions and command/event transport.
+- `session-controller`: private Unix socket, random per-session token, protocol handshake, connection state, command/event transport and correlated inspection requests.
 - `debug-runtime`: GJS ES module intended to be imported by the extension itself; asynchronous Gio Unix-socket connection, heartbeat and bounded stage inspection.
 - Planned: `vscode-extension` and SpiderMonkey debugging-engine integration.
+
+## Session lifecycle and inspection API
+
+`createDebugSession()` owns one runtime endpoint. It exposes `waiting`, `connected` and `closed` states, `waitForRuntime()`, and `inspectStage()`. Inspection requests carry unique IDs, have bounded timeouts, and are rejected if the runtime disconnects before replying. This is the host-side session API; no VS Code UI or automatic extension injection is included yet.
 
 ## Read-only GNOME Shell inspector
 
