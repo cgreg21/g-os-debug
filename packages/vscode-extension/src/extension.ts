@@ -1,5 +1,7 @@
 import * as vscode from 'vscode';
 import { homedir } from 'node:os';
+import { mkdir, chmod, writeFile, rename, unlink, readFile, rm } from 'node:fs/promises';
+import { join } from 'node:path';
 import { createDebugSession, type DebugSession } from '@g-os-debug/session-controller';
 
 interface ActorNode {
@@ -57,6 +59,7 @@ export function activate(context: vscode.ExtensionContext): void {
     let session: DebugSession | undefined;
     let unsubscribe: (() => void) | undefined;
     let starting = false;
+    let sessionDescriptorPath: string | undefined;
 
     const setState = (state: string): void => {
         status.text = state === 'connected' ? '$(debug-alt) G-Os Inspector: connected'
@@ -98,6 +101,19 @@ export function activate(context: vscode.ExtensionContext): void {
                 return;
             }
             session = await createDebugSession({ socketPath, token, runtimeVersion, handshakeTimeoutMs: 30000, requestTimeoutMs: 5000 });
+            const descriptorDirectory = join(homedir(), '.cache', 'g-os-debug');
+            sessionDescriptorPath = join(descriptorDirectory, 'session.json');
+            await mkdir(descriptorDirectory, { recursive: true, mode: 0o700 });
+            await chmod(descriptorDirectory, 0o700);
+            const temporaryDescriptor = `${sessionDescriptorPath}.${process.pid}.tmp`;
+            await rm(temporaryDescriptor, { force: true });
+            await writeFile(temporaryDescriptor, JSON.stringify({
+                version: 1,
+                socketPath: session.socketPath,
+                token: session.token
+            }), { mode: 0o600, flag: 'wx' });
+            await chmod(temporaryDescriptor, 0o600);
+            await rename(temporaryDescriptor, sessionDescriptorPath);
             unsubscribe = session.onStateChanged(state => {
                 setState(state);
                 if (state !== 'connected') tree.setSnapshot(null);
@@ -106,7 +122,13 @@ export function activate(context: vscode.ExtensionContext): void {
             vscode.window.showInformationMessage('G-Os inspector endpoint started. Waiting for the GNOME Shell runtime.');
             await refresh();
         } catch (error) {
+            const failedSession = session;
             session = undefined;
+            if (sessionDescriptorPath) {
+                await unlink(sessionDescriptorPath).catch(() => undefined);
+                sessionDescriptorPath = undefined;
+            }
+            await failedSession?.close().catch(() => undefined);
             setState('closed');
             vscode.window.showErrorMessage(`Could not start G-Os inspector: ${error instanceof Error ? error.message : String(error)}`);
         } finally {
@@ -117,7 +139,16 @@ export function activate(context: vscode.ExtensionContext): void {
     const stop = async (): Promise<void> => {
         unsubscribe?.();
         unsubscribe = undefined;
-        if (session) await session.close();
+        const stoppedSession = session;
+        if (sessionDescriptorPath && stoppedSession) {
+            try {
+                const descriptor = JSON.parse(await readFile(sessionDescriptorPath, 'utf8')) as { token?: string; socketPath?: string };
+                if (descriptor.token === stoppedSession.token && descriptor.socketPath === stoppedSession.socketPath)
+                    await unlink(sessionDescriptorPath);
+            } catch { /* The G-Os extension may already have removed the descriptor. */ }
+        }
+        sessionDescriptorPath = undefined;
+        if (stoppedSession) await stoppedSession.close();
         session = undefined;
         tree.setSnapshot(null);
         setState('closed');
