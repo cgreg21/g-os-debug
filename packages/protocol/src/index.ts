@@ -16,12 +16,15 @@ export type RuntimeRequest =
     | { type: 'hello'; protocolVersion: number; adapterVersion: string; token: string }
     | { type: 'ping'; id: number }
     | { type: 'shutdown'; id: number }
-    | { type: 'inspectStage'; id: number; maxDepth?: number; maxNodes?: number };
+    | { type: 'inspectStage'; id: number; maxDepth?: number; maxNodes?: number }
+    | { type: 'highlightActor'; id: number; actorId: number }
+    | { type: 'clearHighlight'; id: number };
 
 export type RuntimeResponse =
     | { type: 'hello'; protocolVersion: number; runtimeVersion: string; capabilities: string[] }
     | { type: 'pong'; id: number }
     | { type: 'stageSnapshot'; id: number; root: ActorSnapshot | null; truncated: boolean }
+    | { type: 'highlightResult'; id: number; actorId: number | null; success: boolean }
     | { type: 'error'; id?: number; code: string; message: string };
 
 export interface DapMessage {

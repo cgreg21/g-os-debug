@@ -137,7 +137,7 @@ export async function createRuntimeEndpoint(options: RuntimeEndpointOptions): Pr
                     socket.write(JSON.stringify(response) + '\n');
                 } else {
                     const event = message as RuntimeEvent;
-                    if (!event || (event.type !== 'pong' && event.type !== 'stageSnapshot' && event.type !== 'error')) {
+                    if (!event || (event.type !== 'pong' && event.type !== 'stageSnapshot' && event.type !== 'highlightResult' && event.type !== 'error')) {
                         reject('INVALID_MESSAGE', 'Unexpected runtime response');
                         return;
                     }
@@ -178,7 +178,7 @@ export async function createRuntimeEndpoint(options: RuntimeEndpointOptions): Pr
         send(command) {
             if (!activeSocket || state !== 'connected')
                 throw new Error('No authenticated GJS runtime is connected');
-            if (command.type !== 'ping' && command.type !== 'shutdown' && command.type !== 'inspectStage')
+            if (command.type !== 'ping' && command.type !== 'shutdown' && command.type !== 'inspectStage' && command.type !== 'highlightActor' && command.type !== 'clearHighlight')
                 throw new TypeError('Unsupported runtime command');
             activeSocket.write(JSON.stringify(command) + '\n');
         },
@@ -220,6 +220,8 @@ export interface DebugSession {
     readonly state: RuntimeConnectionState;
     waitForRuntime(timeoutMs?: number): Promise<void>;
     inspectStage(options?: { maxDepth?: number; maxNodes?: number; timeoutMs?: number }): Promise<Extract<RuntimeEvent, { type: 'stageSnapshot' }>>;
+    highlightActor(actorId: number, timeoutMs?: number): Promise<Extract<RuntimeEvent, { type: 'highlightResult' }>>;
+    clearHighlight(timeoutMs?: number): Promise<Extract<RuntimeEvent, { type: 'highlightResult' }>>;
     onStateChanged(listener: (state: RuntimeConnectionState) => void): () => void;
     close(): Promise<void>;
 }
@@ -230,7 +232,7 @@ export async function createDebugSession(options: DebugSessionOptions): Promise<
     let nextRequestId = 1;
     let closed = false;
     const pending = new Map<number, {
-        resolve: (value: Extract<RuntimeEvent, { type: 'stageSnapshot' }>) => void;
+        resolve: (value: RuntimeEvent) => void;
         reject: (error: Error) => void;
         timer: ReturnType<typeof setTimeout>;
     }>();
@@ -248,14 +250,14 @@ export async function createDebugSession(options: DebugSessionOptions): Promise<
     });
 
     endpoint.onMessage(message => {
-        if (message.type === 'stageSnapshot' || message.type === 'error') {
+        if (message.type === 'stageSnapshot' || message.type === 'highlightResult' || message.type === 'error') {
             if (message.id === undefined) return;
             const request = pending.get(message.id);
             if (!request) return;
             clearTimeout(request.timer);
             pending.delete(message.id);
-            if (message.type === 'stageSnapshot') request.resolve(message);
-            else request.reject(new Error(message.message));
+            if (message.type === 'error') request.reject(new Error(message.message));
+            else request.resolve(message);
         }
     });
 
@@ -281,30 +283,53 @@ export async function createDebugSession(options: DebugSessionOptions): Promise<
         });
     };
 
+    const request = <T extends RuntimeEvent>(
+        command: RuntimeCommand,
+        expectedType: T['type'],
+        timeoutMs = options.requestTimeoutMs ?? 3000
+    ): Promise<T> => {
+        if (endpoint.state !== 'connected')
+            return Promise.reject(new Error('GJS runtime is not connected'));
+        const id = command.id;
+        return new Promise((resolve, reject) => {
+            const timer = setTimeout(() => {
+                pending.delete(id);
+                reject(new Error(`Timed out waiting for runtime response: ${command.type}`));
+            }, timeoutMs);
+            pending.set(id, {
+                resolve: event => {
+                    if (event.type !== expectedType)
+                        reject(new Error(`Unexpected runtime response: ${event.type}`));
+                    else
+                        resolve(event as T);
+                },
+                reject,
+                timer,
+            });
+            try {
+                endpoint.send(command);
+            } catch (error) {
+                clearTimeout(timer);
+                pending.delete(id);
+                reject(error instanceof Error ? error : new Error(String(error)));
+            }
+        });
+    };
+
     return {
         token: endpoint.token,
         socketPath: endpoint.socketPath,
         get state() { return endpoint.state; },
         waitForRuntime,
-        inspectStage: ({ maxDepth, maxNodes, timeoutMs = options.requestTimeoutMs ?? 3000 } = {}) => {
-            if (endpoint.state !== 'connected')
-                return Promise.reject(new Error('GJS runtime is not connected'));
-            const id = nextRequestId++;
-            return new Promise((resolve, reject) => {
-                const timer = setTimeout(() => {
-                    pending.delete(id);
-                    reject(new Error('Timed out waiting for the GNOME Shell stage snapshot'));
-                }, timeoutMs);
-                pending.set(id, { resolve, reject, timer });
-                try {
-                    endpoint.send({ type: 'inspectStage', id, maxDepth, maxNodes });
-                } catch (error) {
-                    clearTimeout(timer);
-                    pending.delete(id);
-                    reject(error instanceof Error ? error : new Error(String(error)));
-                }
-            });
-        },
+        inspectStage: ({ maxDepth, maxNodes, timeoutMs = options.requestTimeoutMs ?? 3000 } = {}) =>
+            request<Extract<RuntimeEvent, { type: 'stageSnapshot' }>>(
+                { type: 'inspectStage', id: nextRequestId++, maxDepth, maxNodes }, 'stageSnapshot', timeoutMs),
+        highlightActor: (actorId, timeoutMs = options.requestTimeoutMs ?? 3000) =>
+            request<Extract<RuntimeEvent, { type: 'highlightResult' }>>(
+                { type: 'highlightActor', id: nextRequestId++, actorId }, 'highlightResult', timeoutMs),
+        clearHighlight: (timeoutMs = options.requestTimeoutMs ?? 3000) =>
+            request<Extract<RuntimeEvent, { type: 'highlightResult' }>>(
+                { type: 'clearHighlight', id: nextRequestId++ }, 'highlightResult', timeoutMs),
         onStateChanged(listener) {
             stateListeners.add(listener);
             return () => stateListeners.delete(listener);
