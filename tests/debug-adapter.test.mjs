@@ -108,6 +108,30 @@ test('adapter exposes a real runtime stage snapshot through its custom DAP reque
         const response = await adapter.waitFor(m => m.type === 'response' && m.request_seq === 2);
         assert.equal(response.success, true);
         assert.equal(response.body.root.typeName, 'Clutter.Stage');
+        adapter.send(3, 'gOs/highlightActor', { actorId: 42 });
+        const highlightCommand = await waitRuntime('highlightActor');
+        assert.equal(highlightCommand.actorId, 42);
+        runtime.write(JSON.stringify({
+            type: 'highlightResult',
+            id: highlightCommand.id,
+            actorId: 42,
+            success: true,
+        }) + '\\n');
+        const highlightResponse = await adapter.waitFor(m => m.type === 'response' && m.request_seq === 3);
+        assert.equal(highlightResponse.success, true);
+        assert.equal(highlightResponse.body.actorId, 42);
+
+        adapter.send(4, 'gOs/clearHighlight');
+        const clearCommand = await waitRuntime('clearHighlight');
+        runtime.write(JSON.stringify({
+            type: 'highlightResult',
+            id: clearCommand.id,
+            actorId: null,
+            success: true,
+        }) + '\\n');
+        const clearResponse = await adapter.waitFor(m => m.type === 'response' && m.request_seq === 4);
+        assert.equal(clearResponse.success, true);
+        assert.equal(clearResponse.body.actorId, null);
     } finally {
         runtime?.destroy();
         adapter.child.stdin.end();
