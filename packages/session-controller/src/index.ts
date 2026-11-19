@@ -32,7 +32,9 @@ export interface RuntimeEndpoint {
 
 /** Create a private Unix socket endpoint and authenticate the in-process GJS runtime. */
 export async function createRuntimeEndpoint(options: RuntimeEndpointOptions): Promise<RuntimeEndpoint> {
-    const token = options.token ?? randomBytes(32).toString('hex');\n    if (!/^[a-f0-9]{64}$/i.test(token))\n        throw new TypeError('Runtime token must be a 256-bit hexadecimal value');
+    const token = options.token ?? randomBytes(32).toString('hex');
+    if (!/^[a-f0-9]{64}$/i.test(token))
+        throw new TypeError('Runtime token must be a 256-bit hexadecimal value');
     await mkdir(dirname(options.socketPath), { recursive: true, mode: 0o700 });
     await rm(options.socketPath, { force: true });
 
@@ -52,7 +54,8 @@ export async function createRuntimeEndpoint(options: RuntimeEndpointOptions): Pr
                 type: 'error',
                 code: 'SESSION_BUSY',
                 message: 'A runtime is already connected',
-            }) + '\n');
+            }) + '
+');
             return;
         }
 
@@ -64,7 +67,8 @@ export async function createRuntimeEndpoint(options: RuntimeEndpointOptions): Pr
 
         const reject = (code: string, message: string): void => {
             const response: RuntimeResponse = { type: 'error', code, message };
-            socket.end(JSON.stringify(response) + '\n');
+            socket.end(JSON.stringify(response) + '
+');
         };
 
         socket.on('timeout', () => {
@@ -76,12 +80,14 @@ export async function createRuntimeEndpoint(options: RuntimeEndpointOptions): Pr
 
         socket.on('data', (chunk: string) => {
             input += chunk;
-            if (Buffer.byteLength(input, 'utf8') > 16 * 1024 && !input.includes('\n')) {
+            if (Buffer.byteLength(input, 'utf8') > 16 * 1024 && !input.includes('
+')) {
                 reject('MESSAGE_TOO_LARGE', 'Runtime message exceeds 16 KiB');
                 return;
             }
 
-            let newline = input.indexOf('\n');
+            let newline = input.indexOf('
+');
             while (newline >= 0) {
                 const line = input.slice(0, newline);
                 input = input.slice(newline + 1);
@@ -125,7 +131,8 @@ export async function createRuntimeEndpoint(options: RuntimeEndpointOptions): Pr
                         runtimeVersion: options.runtimeVersion,
                         capabilities: options.capabilities ?? [],
                     };
-                    socket.write(JSON.stringify(response) + '\n');
+                    socket.write(JSON.stringify(response) + '
+');
                 } else {
                     const event = message as RuntimeEvent;
                     if (!event || (event.type !== 'pong' && event.type !== 'stageSnapshot' && event.type !== 'error')) {
@@ -134,7 +141,8 @@ export async function createRuntimeEndpoint(options: RuntimeEndpointOptions): Pr
                     }
                     for (const listener of messageListeners) listener(event);
                 }
-                newline = input.indexOf('\n');
+                newline = input.indexOf('
+');
             }
         });
 
@@ -166,7 +174,8 @@ export async function createRuntimeEndpoint(options: RuntimeEndpointOptions): Pr
                 throw new Error('No authenticated GJS runtime is connected');
             if (command.type !== 'ping' && command.type !== 'shutdown' && command.type !== 'inspectStage')
                 throw new TypeError('Unsupported runtime command');
-            activeSocket.write(JSON.stringify(command) + '\n');
+            activeSocket.write(JSON.stringify(command) + '
+');
         },
         onMessage(listener) {
             messageListeners.add(listener);
