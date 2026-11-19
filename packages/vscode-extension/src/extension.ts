@@ -85,16 +85,16 @@ export function activate(context: vscode.ExtensionContext): void {
         try {
             const config = vscode.workspace.getConfiguration('gOsDebug');
             const configuredSocketPath = config.get<string>('socketPath', '');
-            const socketPath = configuredSocketPath.replace(/^\\$\\{userHome\\}|^~/, homedir());
-            const token = config.get<string>('runtimeToken', '');
+            const socketPath = configuredSocketPath.replace('${userHome}', homedir()).replace(/^~/, homedir());
+            const token = await context.secrets.get('gOsDebug.runtimeToken') ?? '';
             const runtimeVersion = config.get<string>('runtimeVersion', '0.1.0');
             if (!socketPath || !/^[a-f0-9]{64}$/i.test(token)) {
-                const action = 'Open Settings';
+                const action = 'Configure Runtime Token';
                 const choice = await vscode.window.showErrorMessage(
                     'Configure gOsDebug.socketPath and a 64-character hexadecimal gOsDebug.runtimeToken shared with the GJS runtime.',
                     action
                 );
-                if (choice === action) await vscode.commands.executeCommand('workbench.action.openSettings', 'gOsDebug');
+                if (choice === action) await vscode.commands.executeCommand('gOsDebug.configureRuntimeToken');
                 return;
             }
             session = await createDebugSession({ socketPath, token, runtimeVersion, handshakeTimeoutMs: 30000, requestTimeoutMs: 5000 });
@@ -128,6 +128,18 @@ export function activate(context: vscode.ExtensionContext): void {
         vscode.commands.registerCommand('gOsDebug.startInspector', start),
         vscode.commands.registerCommand('gOsDebug.refreshActors', refresh),
         vscode.commands.registerCommand('gOsDebug.stopInspector', stop),
+        vscode.commands.registerCommand('gOsDebug.configureRuntimeToken', async () => {
+            const token = await vscode.window.showInputBox({
+                title: 'G-Os Runtime Authentication',
+                prompt: 'Enter the 256-bit hexadecimal token provisioned to the GNOME Shell runtime',
+                password: true,
+                ignoreFocusOut: true,
+                validateInput: value => /^[a-f0-9]{64}$/i.test(value) ? undefined : 'Enter exactly 64 hexadecimal characters.'
+            });
+            if (token === undefined) return;
+            await context.secrets.store('gOsDebug.runtimeToken', token.toLowerCase());
+            vscode.window.showInformationMessage('G-Os runtime token saved in VS Code SecretStorage.');
+        }),
         vscode.commands.registerCommand('gOsDebug.selectActor', (actor: ActorNode) => {
             const lines = [
                 `#${actor.id} ${actor.typeName}`,
@@ -141,11 +153,10 @@ export function activate(context: vscode.ExtensionContext): void {
             channel.appendLine(lines.join('\n'));
             channel.show(true);
             context.subscriptions.push(channel);
-        }),
-        vscode.commands.registerCommand('gOsDebug.refreshActors', refresh)
+        })
     );
     context.subscriptions.push({ dispose: () => { void stop(); } });
-    void start();
+    // Explicit start avoids opening configuration prompts on every VS Code launch.
 }
 
 export function deactivate(): void { /* Session is closed by the extension subscription. */ }

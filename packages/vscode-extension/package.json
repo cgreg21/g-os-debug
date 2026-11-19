@@ -15,7 +15,8 @@
     "commands": [
       { "command": "gOsDebug.startInspector", "title": "G-Os: Start GNOME Shell Inspector" },
       { "command": "gOsDebug.refreshActors", "title": "G-Os: Refresh Actor Tree" },
-      { "command": "gOsDebug.stopInspector", "title": "G-Os: Stop Inspector" }
+      { "command": "gOsDebug.stopInspector", "title": "G-Os: Stop Inspector" },
+      { "command": "gOsDebug.configureRuntimeToken", "title": "G-Os: Configure Runtime Token" }
     ],
     "menus": {
       "view/title": [
@@ -30,11 +31,6 @@
           "type": "string",
           "default": "${userHome}/.cache/g-os-debug/gnome-shell.sock",
           "description": "Private Unix socket shared with the GJS runtime."
-        },
-        "gOsDebug.runtimeToken": {
-          "type": "string",
-          "default": "",
-          "description": "256-bit hexadecimal session token. Provision the same value to the GJS runtime through G-Os."
         },
         "gOsDebug.runtimeVersion": {
           "type": "string",
