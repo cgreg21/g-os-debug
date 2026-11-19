@@ -116,7 +116,7 @@ test('adapter exposes a real runtime stage snapshot through its custom DAP reque
             id: highlightCommand.id,
             actorId: 42,
             success: true,
-        }) + '\\n');
+        }) + '\n');
         const highlightResponse = await adapter.waitFor(m => m.type === 'response' && m.request_seq === 3);
         assert.equal(highlightResponse.success, true);
         assert.equal(highlightResponse.body.actorId, 42);
@@ -128,7 +128,7 @@ test('adapter exposes a real runtime stage snapshot through its custom DAP reque
             id: clearCommand.id,
             actorId: null,
             success: true,
-        }) + '\\n');
+        }) + '\n');
         const clearResponse = await adapter.waitFor(m => m.type === 'response' && m.request_seq === 4);
         assert.equal(clearResponse.success, true);
         assert.equal(clearResponse.body.actorId, null);
