@@ -16,7 +16,7 @@ function handshake(path, payload) {
             data += chunk;
             const end = data.indexOf('\n');
             if (end >= 0) {
-                try { resolve({ response: JSON.parse(data.slice(0, end)), socket, remainder: data.slice(end + 1) }); }
+                try { resolve({ response: JSON.parse(data.slice(0, end)), socket }); }
                 catch (error) { reject(error); }
             }
         });
@@ -24,85 +24,74 @@ function handshake(path, payload) {
     });
 }
 
-test('creates a private socket and authenticates the matching runtime protocol', async () => {
+async function withEndpoint(run) {
     const dir = await mkdtemp(join(tmpdir(), 'g-os-debug-'));
     const path = join(dir, 'runtime.sock');
-    const endpoint = await createRuntimeEndpoint({ socketPath: path, runtimeVersion: 'test', capabilities: ['heartbeat'] });
-    try {
-        assert.equal((await stat(path)).mode & 0o777, 0o600);
-        const result = await handshake(path, { type: 'hello', protocolVersion: 1, adapterVersion: 'test', token: endpoint.token });
-        assert.deepEqual(result.response, { type: 'hello', protocolVersion: 1, runtimeVersion: 'test', capabilities: ['heartbeat'] });
-        result.socket.destroy();
-    } finally {
+    const endpoint = await createRuntimeEndpoint({ socketPath: path, runtimeVersion: 'test' });
+    try { await run({ endpoint, path }); }
+    finally {
         await endpoint.close();
         await rm(dir, { recursive: true, force: true });
     }
+}
+
+test('creates a private socket and authenticates the matching runtime protocol', async () => {
+    await withEndpoint(async ({ endpoint, path }) => {
+        assert.equal((await stat(path)).mode & 0o777, 0o600);
+        const result = await handshake(path, { type: 'hello', protocolVersion: 1, adapterVersion: 'test', token: endpoint.token });
+        assert.deepEqual(result.response, { type: 'hello', protocolVersion: 1, runtimeVersion: 'test', capabilities: [] });
+        result.socket.destroy();
+    });
 });
 
 test('rejects an invalid session token', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'g-os-debug-'));
-    const path = join(dir, 'runtime.sock');
-    const endpoint = await createRuntimeEndpoint({ socketPath: path, runtimeVersion: 'test' });
-    try {
+    await withEndpoint(async ({ endpoint, path }) => {
         const result = await handshake(path, { type: 'hello', protocolVersion: 1, adapterVersion: 'test', token: 'wrong' });
         assert.equal(result.response.code, 'AUTHENTICATION_FAILED');
         result.socket.destroy();
-    } finally {
-        await endpoint.close();
-        await rm(dir, { recursive: true, force: true });
-    }
+    });
 });
 
 test('rejects incompatible runtime protocol versions', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'g-os-debug-'));
-    const path = join(dir, 'runtime.sock');
-    const endpoint = await createRuntimeEndpoint({ socketPath: path, runtimeVersion: 'test' });
-    try {
+    await withEndpoint(async ({ endpoint, path }) => {
         const result = await handshake(path, { type: 'hello', protocolVersion: 99, adapterVersion: 'test', token: endpoint.token });
         assert.equal(result.response.code, 'PROTOCOL_MISMATCH');
         result.socket.destroy();
-    } finally {
-        await endpoint.close();
-        await rm(dir, { recursive: true, force: true });
-    }
+    });
 });
 
-test('sends runtime commands and receives runtime events after authentication', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'g-os-debug-'));
-    const path = join(dir, 'runtime.sock');
-    const endpoint = await createRuntimeEndpoint({ socketPath: path, runtimeVersion: 'test' });
-    try {
+test('sends a bounded stage inspection request and receives a snapshot event', async () => {
+    await withEndpoint(async ({ endpoint, path }) => {
         const result = await handshake(path, { type: 'hello', protocolVersion: 1, adapterVersion: 'test', token: endpoint.token });
-        const event = new Promise(resolve => endpoint.onMessage(resolve));
-        endpoint.send({ type: 'ping', id: 42 });
-
+        const eventPromise = new Promise(resolve => endpoint.onMessage(resolve));
+        endpoint.send({ type: 'inspectStage', id: 7, maxDepth: 4, maxNodes: 100 });
+        let input = '';
         const command = await new Promise((resolve, reject) => {
-            let input = '';
             result.socket.on('data', chunk => {
                 input += chunk;
-                const end = input.indexOf('\n');
-                if (end >= 0) resolve(JSON.parse(input.slice(0, end)));
+                const newline = input.indexOf('\n');
+                if (newline >= 0) resolve(JSON.parse(input.slice(0, newline)));
             });
             result.socket.on('error', reject);
         });
-        assert.deepEqual(command, { type: 'ping', id: 42 });
-        result.socket.write(JSON.stringify({ type: 'pong', id: 42 }) + '\n');
-        assert.deepEqual(await event, { type: 'pong', id: 42 });
+        assert.deepEqual(command, { type: 'inspectStage', id: 7, maxDepth: 4, maxNodes: 100 });
+        result.socket.write(JSON.stringify({
+            type: 'stageSnapshot',
+            id: 7,
+            root: { id: 1, typeName: 'Stage', name: null, visible: true, mapped: true, childCount: 0, allocation: null, children: [] },
+            truncated: false,
+        }) + '\n');
+        const event = await eventPromise;
+        assert.equal(event.type, 'stageSnapshot');
+        assert.equal(event.id, 7);
+        assert.equal(event.root.typeName, 'Stage');
+        assert.equal(event.truncated, false);
         result.socket.destroy();
-    } finally {
-        await endpoint.close();
-        await rm(dir, { recursive: true, force: true });
-    }
+    });
 });
 
 test('refuses commands before an authenticated runtime is connected', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'g-os-debug-'));
-    const path = join(dir, 'runtime.sock');
-    const endpoint = await createRuntimeEndpoint({ socketPath: path, runtimeVersion: 'test' });
-    try {
+    await withEndpoint(async ({ endpoint }) => {
         assert.throws(() => endpoint.send({ type: 'ping', id: 1 }), /No authenticated GJS runtime/);
-    } finally {
-        await endpoint.close();
-        await rm(dir, { recursive: true, force: true });
-    }
+    });
 });

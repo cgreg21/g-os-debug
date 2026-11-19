@@ -4,21 +4,105 @@ import GLib from 'gi://GLib';
 export const RUNTIME_PROTOCOL_VERSION = 1;
 export const RUNTIME_VERSION = '0.1.0';
 const MAX_MESSAGE_BYTES = 16 * 1024;
+const DEFAULT_MAX_DEPTH = 12;
+const DEFAULT_MAX_NODES = 500;
+
+/**
+ * Read-only Clutter actor tree snapshot. Never reads text contents, arbitrary
+ * GObject properties, signal handlers, or extension JavaScript variables.
+ */
+export function snapshotStage(stage, { maxDepth = DEFAULT_MAX_DEPTH, maxNodes = DEFAULT_MAX_NODES } = {}) {
+    if (!stage)
+        return { root: null, truncated: false };
+
+    const depthLimit = Math.max(0, Math.min(Number.isInteger(maxDepth) ? maxDepth : DEFAULT_MAX_DEPTH, 32));
+    const nodeLimit = Math.max(1, Math.min(Number.isInteger(maxNodes) ? maxNodes : DEFAULT_MAX_NODES, 2000));
+    let nextId = 1;
+    let truncated = false;
+
+    const visit = (actor, depth) => {
+        if (nextId > nodeLimit) {
+            truncated = true;
+            return null;
+        }
+
+        const id = nextId++;
+        let allocation = null;
+        try {
+            if (actor.has_allocation()) {
+                const box = actor.get_allocation_box();
+                allocation = {
+                    x: box.x1,
+                    y: box.y1,
+                    width: box.x2 - box.x1,
+                    height: box.y2 - box.y1,
+                };
+            }
+        } catch {
+            // Some actors may not have a valid allocation during relayout.
+        }
+
+        let children = [];
+        let childCount = 0;
+        try {
+            const actors = actor.get_children();
+            childCount = actors.length;
+            if (depth >= depthLimit) {
+                if (childCount > 0)
+                    truncated = true;
+            } else {
+                for (const child of actors) {
+                    const childSnapshot = visit(child, depth + 1);
+                    if (childSnapshot)
+                        children.push(childSnapshot);
+                    else
+                        break;
+                }
+            }
+        } catch {
+            truncated = true;
+        }
+
+        let name = null;
+        try {
+            name = actor.get_name() ?? null;
+        } catch {
+            // Actor names are optional.
+        }
+
+        let visible = false;
+        let mapped = false;
+        try { visible = actor.is_visible(); } catch { /* actor may be disposing */ }
+        try { mapped = actor.is_mapped(); } catch { /* actor may be disposing */ }
+
+        return {
+            id,
+            typeName: actor.constructor?.name ?? 'Clutter.Actor',
+            name,
+            visible,
+            mapped,
+            childCount,
+            allocation,
+            children,
+        };
+    };
+
+    return { root: visit(stage, 0), truncated };
+}
 
 /**
  * Connect from the extension's own GNOME Shell GJS context.
  * Socket operations are asynchronous and do not block the Shell main loop.
- * This transport is not an engine debugger: extension JavaScript cannot
- * access SpiderMonkey's Debugger API through the public GJS API.
  */
 export class DebugRuntime {
-    constructor({ socketPath, token, adapterVersion = '0.1.0', onCommand = () => {} }) {
+    constructor({ socketPath, token, adapterVersion = '0.1.0', onCommand = () => {}, stageProvider = () => global.stage }) {
         if (!socketPath || !token)
             throw new TypeError('socketPath and token are required');
         this._socketPath = socketPath;
         this._token = token;
         this._adapterVersion = adapterVersion;
         this._onCommand = onCommand;
+        this._stageProvider = stageProvider;
         this._client = null;
         this._connection = null;
         this._input = null;
@@ -42,9 +126,7 @@ export class DebugRuntime {
                 }
             });
         });
-        this._input = new Gio.DataInputStream({
-            base_stream: this._connection.get_input_stream(),
-        });
+        this._input = new Gio.DataInputStream({ base_stream: this._connection.get_input_stream() });
         this._output = this._connection.get_output_stream();
 
         await this._writeLine({
@@ -105,20 +187,42 @@ export class DebugRuntime {
         }
     }
 
+    async _handleCommand(message) {
+        if (message.type === 'ping' && Number.isSafeInteger(message.id)) {
+            await this._writeLine({ type: 'pong', id: message.id });
+            return;
+        }
+        if (message.type === 'inspectStage' && Number.isSafeInteger(message.id)) {
+            try {
+                const snapshot = snapshotStage(this._stageProvider(), {
+                    maxDepth: message.maxDepth,
+                    maxNodes: message.maxNodes,
+                });
+                await this._writeLine({ type: 'stageSnapshot', id: message.id, ...snapshot });
+            } catch (error) {
+                await this._writeLine({
+                    type: 'error',
+                    id: message.id,
+                    code: 'INSPECTION_FAILED',
+                    message: error instanceof Error ? error.message : String(error),
+                });
+            }
+            return;
+        }
+        if (message.type === 'shutdown') {
+            this.close();
+            return;
+        }
+        this._onCommand(message);
+    }
+
     async _readLoop() {
         try {
             while (!this._closed) {
                 const message = await this._readLine();
                 if (message === null)
                     break;
-                if (message.type === 'ping' && Number.isSafeInteger(message.id)) {
-                    await this._writeLine({ type: 'pong', id: message.id });
-                } else if (message.type === 'shutdown') {
-                    this.close();
-                    return;
-                } else {
-                    this._onCommand(message);
-                }
+                await this._handleCommand(message);
             }
         } catch (error) {
             if (!this._closed)

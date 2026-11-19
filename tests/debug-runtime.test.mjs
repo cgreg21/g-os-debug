@@ -12,9 +12,13 @@ test('GJS runtime uses Gio Unix sockets and asynchronous stream I/O', () => {
     assert.doesNotMatch(source, /node:net|node:fs|process\.env/);
 });
 
-test('runtime authenticates protocol v1 without claiming engine-debugger features', () => {
-    assert.match(source, /protocolVersion: RUNTIME_PROTOCOL_VERSION/);
-    assert.match(source, /token: this\._token/);
-    assert.match(source, /SpiderMonkey's Debugger API/);
-    assert.doesNotMatch(source, /setBreakpoints|Debugger\.onNewScript|Debugger\.onEnterFrame/);
+test('runtime implements bounded, read-only Clutter stage snapshots', () => {
+    assert.match(source, /snapshotStage/);
+    assert.match(source, /get_children\(\)/);
+    assert.match(source, /get_allocation_box\(\)/);
+    assert.match(source, /DEFAULT_MAX_DEPTH/);
+    assert.match(source, /DEFAULT_MAX_NODES/);
+    assert.match(source, /inspectStage/);
+    assert.match(source, /stageSnapshot/);
+    assert.doesNotMatch(source, /get_text\(\)|get_property\(|setBreakpoints/);
 });

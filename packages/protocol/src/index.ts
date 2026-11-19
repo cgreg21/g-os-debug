@@ -1,14 +1,27 @@
 /** Versioned private protocol shared by the adapter and the in-process GJS runtime. */
 export const RUNTIME_PROTOCOL_VERSION = 1 as const;
 
+export interface ActorSnapshot {
+    id: number;
+    typeName: string;
+    name: string | null;
+    visible: boolean;
+    mapped: boolean;
+    childCount: number;
+    allocation: { x: number; y: number; width: number; height: number } | null;
+    children: ActorSnapshot[];
+}
+
 export type RuntimeRequest =
     | { type: 'hello'; protocolVersion: number; adapterVersion: string; token: string }
     | { type: 'ping'; id: number }
-    | { type: 'shutdown'; id: number };
+    | { type: 'shutdown'; id: number }
+    | { type: 'inspectStage'; id: number; maxDepth?: number; maxNodes?: number };
 
 export type RuntimeResponse =
     | { type: 'hello'; protocolVersion: number; runtimeVersion: string; capabilities: string[] }
     | { type: 'pong'; id: number }
+    | { type: 'stageSnapshot'; id: number; root: ActorSnapshot | null; truncated: boolean }
     | { type: 'error'; id?: number; code: string; message: string };
 
 export interface DapMessage {

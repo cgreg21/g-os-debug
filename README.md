@@ -12,25 +12,29 @@ VS Code ── DAP/stdio ── Debug Adapter ── private Unix socket ── 
                                                            GNOME Shell context
 Session Controller ── owns socket, token and runtime handshake
 Source Map Service ── maps generated JavaScript to TypeScript
-GNOME Inspector ───── planned safe actor-tree snapshots and properties
+GNOME Inspector ───── read-only Clutter stage snapshots
 ```
 
 A separate GJS process cannot inspect the JavaScript heap or execution context of an extension loaded into `gnome-shell`. The runtime must execute in the actual Shell process/context.
 
 ## Packages
 
-- `protocol`: versioned runtime contract and DAP framing.
+- `protocol`: versioned private runtime contract, actor snapshot types and DAP framing.
 - `debug-adapter`: DAP stdio endpoint.
 - `source-maps`: JavaScript/TypeScript source mapping.
-- `session-controller`: private Unix socket, random per-session token, protocol handshake, socket permissions and timeout.
-- `debug-runtime`: GJS ES module intended to be imported by the extension itself; asynchronous Gio Unix-socket connection, authenticated handshake and heartbeat.
-- Planned: `gnome-inspector`, `vscode-extension`, and SpiderMonkey debugging-engine integration.
+- `session-controller`: private Unix socket, random per-session token, protocol handshake, socket permissions and command/event transport.
+- `debug-runtime`: GJS ES module intended to be imported by the extension itself; asynchronous Gio Unix-socket connection, heartbeat and bounded stage inspection.
+- Planned: `vscode-extension` and SpiderMonkey debugging-engine integration.
+
+## Read-only GNOME Shell inspector
+
+The GJS runtime accepts `inspectStage` and returns a `stageSnapshot` tree based on `global.stage` and Clutter.Actor methods. Each node contains a local snapshot ID, actor type, optional actor name, visibility, mapped state, child count and allocation rectangle. Depth and node count are bounded (defaults: 12 levels and 500 nodes; hard limits: 32 levels and 2,000 nodes).
+
+The snapshot deliberately does not read text contents, arbitrary GObject properties, signal handlers, or extension JavaScript variables. It is an inspection transport primitive, not a JavaScript debugger. The runtime must be imported by an extension in the actual GNOME Shell process; no automatic injection is implemented yet.
 
 ## Runtime transport security
 
-The controller creates a Unix-domain socket with mode `0600`, generates a cryptographically random 256-bit session token, enforces a 16 KiB handshake limit and rejects token or protocol-version mismatches. No TCP listener is opened. The GJS runtime uses Gio asynchronous APIs and must be loaded in the extension's own Shell context.
-
-The runtime currently establishes transport and responds to heartbeat requests. The session controller can send ping/shutdown commands and receive runtime responses through a small event API. It does **not** yet inspect extension objects, pause JavaScript, implement breakpoints, expose scopes or variables, or provide stepping.
+The controller creates a Unix-domain socket with mode `0600`, generates a cryptographically random 256-bit session token, enforces a 16 KiB message limit and rejects token or protocol-version mismatches. No TCP listener is opened. The GJS runtime uses Gio asynchronous APIs.
 
 ## SpiderMonkey debugging limitation
 

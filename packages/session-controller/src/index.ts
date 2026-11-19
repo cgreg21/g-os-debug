@@ -118,7 +118,7 @@ export async function createRuntimeEndpoint(options: RuntimeEndpointOptions): Pr
                     socket.write(JSON.stringify(response) + '\n');
                 } else {
                     const event = message as RuntimeEvent;
-                    if (!event || (event.type !== 'pong' && event.type !== 'error')) {
+                    if (!event || (event.type !== 'pong' && event.type !== 'stageSnapshot' && event.type !== 'error')) {
                         reject('INVALID_MESSAGE', 'Unexpected runtime response');
                         return;
                     }
@@ -154,7 +154,7 @@ export async function createRuntimeEndpoint(options: RuntimeEndpointOptions): Pr
         send(command) {
             if (!activeSocket || !runtimeReady)
                 throw new Error('No authenticated GJS runtime is connected');
-            if (command.type !== 'ping' && command.type !== 'shutdown')
+            if (command.type !== 'ping' && command.type !== 'shutdown' && command.type !== 'inspectStage')
                 throw new TypeError('Unsupported runtime command');
             activeSocket.write(JSON.stringify(command) + '\n');
         },
