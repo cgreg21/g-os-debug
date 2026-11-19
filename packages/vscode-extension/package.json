@@ -1,0 +1,50 @@
+{
+  "name": "@g-os-debug/vscode-extension",
+  "displayName": "G-Os GNOME Shell Inspector",
+  "description": "Read-only GNOME Shell Clutter stage inspector for G-Os Debugger",
+  "version": "0.1.0",
+  "publisher": "g-os-debug",
+  "engines": { "vscode": "^1.95.0" },
+  "categories": ["Debuggers", "Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "views": {
+      "debug": [{ "id": "gOsActors", "name": "GNOME Shell Actors" }]
+    },
+    "commands": [
+      { "command": "gOsDebug.startInspector", "title": "G-Os: Start GNOME Shell Inspector" },
+      { "command": "gOsDebug.refreshActors", "title": "G-Os: Refresh Actor Tree" },
+      { "command": "gOsDebug.stopInspector", "title": "G-Os: Stop Inspector" }
+    ],
+    "menus": {
+      "view/title": [
+        { "command": "gOsDebug.refreshActors", "when": "view == gOsActors", "group": "navigation" },
+        { "command": "gOsDebug.stopInspector", "when": "view == gOsActors", "group": "navigation" }
+      ]
+    },
+    "configuration": {
+      "title": "G-Os Debugger",
+      "properties": {
+        "gOsDebug.socketPath": {
+          "type": "string",
+          "default": "${userHome}/.cache/g-os-debug/gnome-shell.sock",
+          "description": "Private Unix socket shared with the GJS runtime."
+        },
+        "gOsDebug.runtimeToken": {
+          "type": "string",
+          "default": "",
+          "description": "256-bit hexadecimal session token. Provision the same value to the GJS runtime through G-Os."
+        },
+        "gOsDebug.runtimeVersion": {
+          "type": "string",
+          "default": "0.1.0",
+          "description": "Expected GJS runtime version."
+        }
+      }
+    }
+  },
+  "scripts": { "build": "tsc -p tsconfig.json" },
+  "dependencies": { "@g-os-debug/session-controller": "0.2.0" },
+  "devDependencies": { "@types/vscode": "^1.95.0" }
+}
