@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@g-os-debug/protocol": "0.2.0"
+    "@g-os-debug/protocol": "0.2.0",
+    "@g-os-debug/session-controller": "0.2.0"
   }
 }

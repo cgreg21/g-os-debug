@@ -32,7 +32,7 @@ export interface RuntimeEndpoint {
 
 /** Create a private Unix socket endpoint and authenticate the in-process GJS runtime. */
 export async function createRuntimeEndpoint(options: RuntimeEndpointOptions): Promise<RuntimeEndpoint> {
-    const token = randomBytes(32).toString('hex');
+    const token = options.token ?? randomBytes(32).toString('hex');\n    if (!/^[a-f0-9]{64}$/i.test(token))\n        throw new TypeError('Runtime token must be a 256-bit hexadecimal value');
     await mkdir(dirname(options.socketPath), { recursive: true, mode: 0o700 });
     await rm(options.socketPath, { force: true });
 
