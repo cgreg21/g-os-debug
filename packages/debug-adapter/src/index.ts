@@ -84,6 +84,28 @@ async function handle(request: DapMessage): Promise<void> {
                 response(request, false, undefined, error instanceof Error ? error.message : String(error));
             }
             break;
+        case 'gOs/highlightActor':
+            try {
+                const current = await getSession();
+                const args = (request.arguments ?? {}) as { actorId?: number; timeoutMs?: number };
+                if (!Number.isSafeInteger(args.actorId) || (args.actorId ?? 0) <= 0)
+                    throw new TypeError('gOs/highlightActor requires a positive actorId.');
+                const result = await current.highlightActor(args.actorId!, args.timeoutMs);
+                response(request, true, result);
+            } catch (error) {
+                response(request, false, undefined, error instanceof Error ? error.message : String(error));
+            }
+            break;
+        case 'gOs/clearHighlight':
+            try {
+                const current = await getSession();
+                const args = (request.arguments ?? {}) as { timeoutMs?: number };
+                const result = await current.clearHighlight(args.timeoutMs);
+                response(request, true, result);
+            } catch (error) {
+                response(request, false, undefined, error instanceof Error ? error.message : String(error));
+            }
+            break;
         case 'launch':
         case 'attach':
             response(request, false, undefined,
