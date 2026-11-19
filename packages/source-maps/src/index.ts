@@ -91,6 +91,8 @@ export class SourceMapResolver {
         const normalizedRequested = resolve(requested);
         const sources = this.#map.sources;
         for (const source of sources) {
+            if (!source)
+                continue;
             const resolved = this.#resolveSource(source);
             if (resolved === normalizedRequested)
                 return source;
