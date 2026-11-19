@@ -29,10 +29,12 @@ A separate GJS process cannot inspect the JavaScript heap or execution context o
 
 ## DAP inspector requests
 
-The adapter accepts two custom DAP requests:
+The adapter accepts four custom DAP requests:
 
 - `gOs/sessionStatus`: reports whether the configured runtime is waiting or connected.
 - `gOs/inspectStage`: requests a real, bounded snapshot from the runtime.
+- `gOs/highlightActor`: asks the runtime to outline a visible actor by its ID from the latest stage snapshot. Pass `{ "actorId": 42 }` in the DAP arguments.
+- `gOs/clearHighlight`: removes the current actor outline.
 
 Configure the adapter process with `GOS_DEBUG_SOCKET_PATH` and `GOS_DEBUG_RUNTIME_TOKEN`. The token must be a 256-bit hexadecimal value and must be provisioned to the extension runtime through a trusted session launcher. The adapter does not expose the token over DAP. A missing or disconnected runtime produces an explicit error; no sample or synthetic actor tree is returned.
 
