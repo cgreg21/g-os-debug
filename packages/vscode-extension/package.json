@@ -40,6 +40,14 @@
       {
         "command": "gOsDebug.configureRuntimeToken",
         "title": "G-Os: Configure Runtime Token"
+      },
+      {
+        "command": "gOsDebug.highlightActor",
+        "title": "G-Os: Highlight Actor"
+      },
+      {
+        "command": "gOsDebug.clearHighlight",
+        "title": "G-Os: Clear Actor Highlight"
       }
     ],
     "menus": {
@@ -52,6 +60,23 @@
         {
           "command": "gOsDebug.stopInspector",
           "when": "view == gOsActors",
+          "group": "navigation"
+        },
+        {
+          "command": "gOsDebug.clearHighlight",
+          "when": "view == gOsActors",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "gOsDebug.highlightActor",
+          "when": "view == gOsActors && viewItem == gOsActor",
+          "group": "inline"
+        },
+        {
+          "command": "gOsDebug.highlightActor",
+          "when": "view == gOsActors && viewItem == gOsActor",
           "group": "navigation"
         }
       ]

@@ -166,6 +166,23 @@ export function activate(context: vscode.ExtensionContext): void {
         view, status, tree,
         vscode.commands.registerCommand('gOsDebug.startInspector', start),
         vscode.commands.registerCommand('gOsDebug.refreshActors', refresh),
+        vscode.commands.registerCommand('gOsDebug.highlightActor', async (actor: ActorNode) => {
+            if (!session || session.state !== 'connected') {
+                vscode.window.showWarningMessage('Connect the G-Os runtime before highlighting an actor.');
+                return;
+            }
+            try {
+                await session.highlightActor(actor.id);
+                vscode.window.setStatusBarMessage(`G-Os: actor #${actor.id} highlighted`, 3000);
+            } catch (error) {
+                vscode.window.showErrorMessage(`Could not highlight actor #${actor.id}: ${error instanceof Error ? error.message : String(error)}`);
+            }
+        }),
+        vscode.commands.registerCommand('gOsDebug.clearHighlight', async () => {
+            if (!session || session.state !== 'connected') return;
+            try { await session.clearHighlight(); }
+            catch (error) { vscode.window.showErrorMessage(`Could not clear actor highlight: ${error instanceof Error ? error.message : String(error)}`); }
+        }),
         vscode.commands.registerCommand('gOsDebug.stopInspector', stop),
         vscode.commands.registerCommand('gOsDebug.configureRuntimeToken', async () => {
             const token = await vscode.window.showInputBox({
