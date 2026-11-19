@@ -58,32 +58,45 @@ test('adapter exposes a real runtime stage snapshot through its custom DAP reque
         assert.equal(initialStatus.body.state, 'waiting');
         runtime = connect(socketPath);
         runtime.setEncoding('utf8');
-        let input = '';
+        let runtimeInput = '';
+        const runtimeMessages = [];
+        const runtimeWaiters = [];
         runtime.on('data', chunk => {
-            input += chunk;
-            const newline = input.indexOf('\n');
-            if (newline >= 0) {
-                const handshake = JSON.parse(input.slice(0, newline));
-                assert.equal(handshake.type, 'hello');
+            runtimeInput += chunk;
+            let newline = runtimeInput.indexOf('\n');
+            while (newline >= 0) {
+                runtimeMessages.push(JSON.parse(runtimeInput.slice(0, newline)));
+                runtimeInput = runtimeInput.slice(newline + 1);
+                for (let i = runtimeWaiters.length - 1; i >= 0; i--) {
+                    const waiter = runtimeWaiters[i];
+                    const match = runtimeMessages.find(waiter.predicate);
+                    if (match) {
+                        runtimeWaiters.splice(i, 1);
+                        clearTimeout(waiter.timer);
+                        waiter.resolve(match);
+                    }
+                }
+                newline = runtimeInput.indexOf('\n');
             }
         });
+        const waitRuntime = type => new Promise((resolve, reject) => {
+            const predicate = message => message.type === type;
+            const existing = runtimeMessages.find(predicate);
+            if (existing) return resolve(existing);
+            const waiter = { predicate, resolve, reject, timer: setTimeout(() => {
+                runtimeWaiters.splice(runtimeWaiters.indexOf(waiter), 1);
+                reject(new Error('Timed out waiting for runtime ' + type));
+            }, 1000) };
+            runtimeWaiters.push(waiter);
+        });
+        const handshakeResponse = waitRuntime('hello');
         runtime.write(JSON.stringify({
             type: 'hello', protocolVersion: 1, adapterVersion: 'test', token,
         }) + '\n');
+        await handshakeResponse;
         await adapter.waitFor(m => m.type === 'response' && m.request_seq === 1 && m.success === true);
         adapter.send(2, 'gOs/inspectStage', { maxDepth: 2, maxNodes: 10 });
-        let commandBuffer = '';
-        const command = await new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => reject(new Error('No inspection command received')), 1000);
-            runtime.on('data', chunk => {
-                commandBuffer += chunk;
-                const newline = commandBuffer.indexOf('\n');
-                if (newline >= 0) {
-                    clearTimeout(timeout);
-                    resolve(JSON.parse(commandBuffer.slice(0, newline)));
-                }
-            });
-        });
+        const command = await waitRuntime('inspectStage');
         assert.equal(command.type, 'inspectStage');
         assert.equal(command.maxDepth, 2);
         runtime.write(JSON.stringify({
