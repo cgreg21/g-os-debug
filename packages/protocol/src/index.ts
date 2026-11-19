@@ -17,13 +17,12 @@ export interface DapMessage {
     [key: string]: unknown;
 }
 
-/** Encode a DAP message using the Content-Length framing required by DAP. */
 export function encodeDapMessage(message: DapMessage): Buffer {
     const body = Buffer.from(JSON.stringify(message), 'utf8');
-    return Buffer.concat([Buffer.from(`Content-Length: ${body.length}\r\n\r\n`, 'ascii'), body]);
+    return Buffer.concat([Buffer.from(\`Content-Length: \${body.length}\r\n\r\n\`, 'ascii'), body]);
 }
 
-/** Incremental DAP frame decoder; handles partial and coalesced stdin chunks. */
+/** Incremental decoder for partial and coalesced DAP stdio frames. */
 export class DapFrameDecoder {
     #buffer = Buffer.alloc(0);
 
@@ -34,7 +33,7 @@ export class DapFrameDecoder {
             const boundary = this.#buffer.indexOf('\r\n\r\n');
             if (boundary < 0) break;
             const headers = this.#buffer.subarray(0, boundary).toString('ascii');
-            const match = /^Content-Length:\\s*(\\d+)\\s*$/im.exec(headers);
+            const match = /^Content-Length:\s*(\d+)\s*$/im.exec(headers);
             if (!match) throw new Error('Invalid DAP frame: missing Content-Length header');
             const length = Number(match[1]);
             if (!Number.isSafeInteger(length) || length < 0 || length > 16 * 1024 * 1024)
