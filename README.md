@@ -7,7 +7,8 @@ A debugging toolchain for GNOME Shell extensions, designed around DAP, GJS and V
 ## Architecture
 
 ```text
-VS Code ── DAP/stdio ── Debug Adapter ── Debug Session ── private Unix socket ── GJS runtime
+VS Code Inspector ── Session Controller ── private Unix socket ── GJS runtime
+VS Code Debugger ── DAP/stdio ── Debug Adapter ── SpiderMonkey engine (not yet integrated)
                                                                                   │
                                                                            GNOME Shell context
 Source Map Service ── maps generated JavaScript to TypeScript
@@ -23,7 +24,8 @@ A separate GJS process cannot inspect the JavaScript heap or execution context o
 - `source-maps`: JavaScript/TypeScript source mapping.
 - `session-controller`: private Unix socket, random or externally provisioned per-session token, protocol handshake, connection state and correlated inspection requests.
 - `debug-runtime`: GJS ES module intended to be imported by the extension itself; asynchronous Gio Unix-socket connection, heartbeat and bounded stage inspection.
-- Planned: `vscode-extension` and SpiderMonkey debugging-engine integration.
+- `vscode-extension`: bundled VS Code sidebar inspector with secure token storage and a short-lived session descriptor shared with G-Os.
+- Still planned: SpiderMonkey debugging-engine integration for breakpoints, stepping, scopes and variables.
 
 ## DAP inspector requests
 

@@ -60,6 +60,7 @@ export function activate(context: vscode.ExtensionContext): void {
     let unsubscribe: (() => void) | undefined;
     let starting = false;
     let sessionDescriptorPath: string | undefined;
+    let sessionDescriptorPublished = false;
 
     const setState = (state: string): void => {
         status.text = state === 'connected' ? '$(debug-alt) G-Os Inspector: connected'
@@ -114,6 +115,7 @@ export function activate(context: vscode.ExtensionContext): void {
             }), { mode: 0o600, flag: 'wx' });
             await chmod(temporaryDescriptor, 0o600);
             await rename(temporaryDescriptor, sessionDescriptorPath);
+            sessionDescriptorPublished = true;
             unsubscribe = session.onStateChanged(state => {
                 setState(state);
                 if (state !== 'connected') tree.setSnapshot(null);
@@ -124,10 +126,15 @@ export function activate(context: vscode.ExtensionContext): void {
         } catch (error) {
             const failedSession = session;
             session = undefined;
-            if (sessionDescriptorPath) {
-                await unlink(sessionDescriptorPath).catch(() => undefined);
-                sessionDescriptorPath = undefined;
+            if (sessionDescriptorPublished && sessionDescriptorPath && failedSession) {
+                try {
+                    const descriptor = JSON.parse(await readFile(sessionDescriptorPath, 'utf8')) as { token?: string; socketPath?: string };
+                    if (descriptor.token === failedSession.token && descriptor.socketPath === failedSession.socketPath)
+                        await unlink(sessionDescriptorPath);
+                } catch { /* Do not remove a descriptor owned by another session. */ }
             }
+            sessionDescriptorPublished = false;
+            sessionDescriptorPath = undefined;
             await failedSession?.close().catch(() => undefined);
             setState('closed');
             vscode.window.showErrorMessage(`Could not start G-Os inspector: ${error instanceof Error ? error.message : String(error)}`);
@@ -147,6 +154,7 @@ export function activate(context: vscode.ExtensionContext): void {
                     await unlink(sessionDescriptorPath);
             } catch { /* The G-Os extension may already have removed the descriptor. */ }
         }
+        sessionDescriptorPublished = false;
         sessionDescriptorPath = undefined;
         if (stoppedSession) await stoppedSession.close();
         session = undefined;
