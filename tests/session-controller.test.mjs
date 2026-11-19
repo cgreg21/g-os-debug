@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { connect } from 'node:net';
-import { mkdtemp, stat, rm } from 'node:fs/promises';
+import { mkdtemp, stat, rm, writeFile, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createRuntimeEndpoint } from '../packages/session-controller/dist/index.js';
@@ -94,4 +94,19 @@ test('refuses commands before an authenticated runtime is connected', async () =
     await withEndpoint(async ({ endpoint }) => {
         assert.throws(() => endpoint.send({ type: 'ping', id: 1 }), /No authenticated GJS runtime/);
     });
+});
+
+test('does not remove an existing file at the requested socket path', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'g-os-debug-existing-'));
+    const path = join(dir, 'runtime.sock');
+    await writeFile(path, 'preserve me');
+    try {
+        await assert.rejects(
+            createRuntimeEndpoint({ socketPath: path, runtimeVersion: 'test' }),
+            /already exists/
+        );
+        assert.equal(await readFile(path, 'utf8'), 'preserve me');
+    } finally {
+        await rm(dir, { recursive: true, force: true });
+    }
 });

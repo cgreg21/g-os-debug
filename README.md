@@ -50,7 +50,7 @@ The snapshot deliberately does not read text contents, arbitrary GObject propert
 
 ## Runtime transport security
 
-The controller creates a Unix-domain socket with mode `0600`, uses a cryptographically random 256-bit token by default (or accepts a trusted externally provisioned token), enforces a 16 KiB message limit and rejects token or protocol-version mismatches. No TCP listener is opened. The GJS runtime uses Gio asynchronous APIs.
+The controller creates a Unix-domain socket with mode `0600`, uses a cryptographically random 256-bit token by default (or accepts a trusted externally provisioned token), enforces a 16 KiB message limit and rejects token or protocol-version mismatches. It refuses to overwrite an existing path and only unlinks the exact socket inode it created during shutdown. If a previous crash leaves a stale socket, remove it manually only after confirming no inspector process is still using it. No TCP listener is opened. The GJS runtime uses Gio asynchronous APIs.
 
 ## SpiderMonkey debugging limitation
 

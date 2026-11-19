@@ -1,5 +1,5 @@
 import { createServer, type Server, type Socket } from 'node:net';
-import { chmod, mkdir, rm } from 'node:fs/promises';
+import { chmod, lstat, mkdir, unlink } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import {
@@ -37,7 +37,13 @@ export async function createRuntimeEndpoint(options: RuntimeEndpointOptions): Pr
     if (!/^[a-f0-9]{64}$/i.test(token))
         throw new TypeError('Runtime token must be a 256-bit hexadecimal value');
     await mkdir(dirname(options.socketPath), { recursive: true, mode: 0o700 });
-    await rm(options.socketPath, { force: true });
+    try {
+        await lstat(options.socketPath);
+        throw new Error('Runtime socket path already exists; refusing to replace an existing file or socket');
+    } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
+            throw error;
+    }
 
     let activeSocket: Socket | undefined;
     let state: RuntimeConnectionState = 'waiting';
@@ -158,6 +164,11 @@ export async function createRuntimeEndpoint(options: RuntimeEndpointOptions): Pr
         });
     });
     await chmod(options.socketPath, 0o600);
+    const socketIdentity = await lstat(options.socketPath);
+    if (!socketIdentity.isSocket()) {
+        await new Promise<void>(resolve => server.close(() => resolve()));
+        throw new Error('Runtime socket path was replaced during endpoint creation');
+    }
 
     return {
         token,
@@ -185,7 +196,14 @@ export async function createRuntimeEndpoint(options: RuntimeEndpointOptions): Pr
             await new Promise<void>((resolve, reject) => {
                 server.close(error => error ? reject(error) : resolve());
             });
-            await rm(options.socketPath, { force: true });
+            try {
+                const current = await lstat(options.socketPath);
+                if (current.isSocket() && current.dev === socketIdentity.dev && current.ino === socketIdentity.ino)
+                    await unlink(options.socketPath);
+            } catch (error) {
+                if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
+                    throw error;
+            }
             messageListeners.clear();
             stateListeners.clear();
         },
