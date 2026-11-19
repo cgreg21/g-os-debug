@@ -19,7 +19,8 @@ export interface DapMessage {
 
 export function encodeDapMessage(message: DapMessage): Buffer {
     const body = Buffer.from(JSON.stringify(message), 'utf8');
-    return Buffer.concat([Buffer.from(\`Content-Length: \${body.length}\r\n\r\n\`, 'ascii'), body]);
+    const header = Buffer.from('Content-Length: ' + body.length + '\r\n\r\n', 'ascii');
+    return Buffer.concat([header, body]);
 }
 
 /** Incremental decoder for partial and coalesced DAP stdio frames. */
