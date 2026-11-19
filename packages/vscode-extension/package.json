@@ -75,9 +75,6 @@
   "scripts": {
     "build": "esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=dist/extension.js"
   },
-  "dependencies": {
-    "@g-os-debug/session-controller": "0.2.0"
-  },
   "devDependencies": {
     "@types/vscode": "^1.95.0"
   }
