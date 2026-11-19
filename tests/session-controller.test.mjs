@@ -123,18 +123,18 @@ test('supports actor highlight and clear-highlight runtime commands', async () =
         const highlightCommand = await new Promise((resolve, reject) => {
             result.socket.on('data', chunk => {
                 input += chunk;
-                const newline = input.indexOf('\\n');
+                const newline = input.indexOf('\n');
                 if (newline >= 0) resolve(JSON.parse(input.slice(0, newline)));
             });
             result.socket.on('error', reject);
         });
         assert.deepEqual(highlightCommand, { type: 'highlightActor', id: 21, actorId: 9 });
-        result.socket.write(JSON.stringify({ type: 'highlightResult', id: 21, actorId: 9, success: true }) + '\\n');
+        result.socket.write(JSON.stringify({ type: 'highlightResult', id: 21, actorId: 9, success: true }) + '\n');
         await new Promise(resolve => setImmediate(resolve));
         assert.deepEqual(events[0], { type: 'highlightResult', id: 21, actorId: 9, success: true });
 
         endpoint.send({ type: 'clearHighlight', id: 22 });
-        result.socket.write(JSON.stringify({ type: 'highlightResult', id: 22, actorId: null, success: true }) + '\\n');
+        result.socket.write(JSON.stringify({ type: 'highlightResult', id: 22, actorId: null, success: true }) + '\n');
         await new Promise(resolve => setImmediate(resolve));
         assert.deepEqual(events[1], { type: 'highlightResult', id: 22, actorId: null, success: true });
         result.socket.destroy();
