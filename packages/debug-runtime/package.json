@@ -1,0 +1,7 @@
+{
+  "name": "@g-os-debug/debug-runtime",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "In-process GJS runtime transport for GNOME Shell extensions"
+}
