@@ -1,0 +1,13 @@
+{
+  "name": "@g-os-debug/session-controller",
+  "version": "0.2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@g-os-debug/protocol": "0.2.0"
+  }
+}

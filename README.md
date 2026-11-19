@@ -1,43 +1,33 @@
 # G-Os Debugger
 
-A reusable debugging toolchain for GNOME Shell extensions, designed around the
-Debug Adapter Protocol (DAP), GJS and Visual Studio Code.
+A debugging toolchain for GNOME Shell extensions, designed around DAP, GJS and Visual Studio Code.
 
-> **Status: early development.** The adapter can speak DAP framing and initialize
-> a client, but cannot launch or attach until a compatible debugger runtime is
-> integrated into the GNOME Shell process. Breakpoints are not simulated.
+> **Status: early development.** The DAP adapter initializes, but cannot launch or attach until a debugger runtime is integrated into the GNOME Shell process. Breakpoints are not simulated.
 
 ## Architecture
 
 ```text
-VS Code ── DAP/stdio ── Debug Adapter ── private local transport ── GJS runtime
-                                                                      │
-                                                               GNOME Shell context
-
-Session Controller ── launches and supervises isolated GNOME Shell
-Source Map Service ── maps generated JavaScript locations to TypeScript
-GNOME Inspector ───── exposes safe actor-tree snapshots and properties
+VS Code ── DAP/stdio ── Debug Adapter ── private Unix socket ── GJS runtime
+                                                                  │
+                                                           GNOME Shell context
+Session Controller ── owns socket, token and runtime handshake
+Source Map Service ── maps generated JavaScript to TypeScript
+GNOME Inspector ───── planned safe actor-tree snapshots and properties
 ```
 
-A separate `gjs` process cannot inspect the JavaScript heap or execution context
-of an extension loaded into `gnome-shell`. The runtime must execute in the actual
-Shell process/context. Until then, launch/attach requests fail explicitly.
+A separate GJS process cannot inspect the JavaScript heap or execution context of an extension loaded into `gnome-shell`. The runtime must execute in the actual Shell process/context.
 
 ## Packages
 
-- `packages/protocol`: versioned adapter/runtime contracts and DAP framing.
-- `packages/debug-adapter`: DAP stdio endpoint and capability negotiation.
-- `packages/source-maps`: bidirectional JavaScript/TypeScript source mapping.
-- Planned: `session-controller`, `debug-runtime`, `gnome-inspector`,
-  `vscode-extension`.
+- `protocol`: versioned runtime contract and DAP framing.
+- `debug-adapter`: DAP stdio endpoint.
+- `source-maps`: JavaScript/TypeScript source mapping.
+- `session-controller`: private Unix socket, random per-session token, protocol handshake, socket permissions and timeout.
+- Planned: `debug-runtime`, `gnome-inspector`, `vscode-extension`.
 
-## Security and reliability
+## Runtime transport security
 
-- Runtime endpoint disabled outside explicit development sessions.
-- Private Unix-domain socket with restrictive permissions; no public TCP listener.
-- Runtime handshake validates protocol version and an unpredictable session token.
-- Pausing the Shell freezes the nested desktop; terminate/restart must remain
-  available even when execution is paused.
+The controller creates a Unix-domain socket with mode `0600`, generates a cryptographically random 256-bit session token, enforces a 16 KiB handshake limit and rejects token or protocol-version mismatches. No TCP listener is opened. The current transport is a handshake foundation; it does not yet carry debugger commands or inspect GNOME Shell.
 
 ## Development
 
@@ -45,6 +35,4 @@ Shell process/context. Until then, launch/attach requests fail explicitly.
 - `npm run typecheck`: strict TypeScript checks.
 - `npm run debug-adapter`: start the DAP stdio endpoint.
 
-The current adapter deliberately rejects launch/attach while no runtime is
-connected. This is an honest boundary, not a limitation hidden behind fake
-breakpoint responses.
+Launch/attach remain explicitly unavailable until the in-process GJS runtime is implemented.

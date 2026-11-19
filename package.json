@@ -1,15 +1,15 @@
 {
   "name": "@g-os-debug/workspace",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "workspaces": [
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspace @g-os-debug/protocol && npm run build --workspace @g-os-debug/source-maps && npm run build --workspace @g-os-debug/debug-adapter",
+    "build": "npm run build --workspace @g-os-debug/protocol && npm run build --workspace @g-os-debug/source-maps && npm run build --workspace @g-os-debug/session-controller && npm run build --workspace @g-os-debug/debug-adapter",
     "test": "npm run build && node --test tests/*.test.mjs",
-    "typecheck": "tsc --noEmit -p packages/protocol/tsconfig.json && tsc --noEmit -p packages/source-maps/tsconfig.json && tsc --noEmit -p packages/debug-adapter/tsconfig.json",
+    "typecheck": "tsc --noEmit -p packages/protocol/tsconfig.json && tsc --noEmit -p packages/source-maps/tsconfig.json && tsc --noEmit -p packages/session-controller/tsconfig.json && tsc --noEmit -p packages/debug-adapter/tsconfig.json",
     "debug-adapter": "node packages/debug-adapter/dist/index.js"
   },
   "devDependencies": {
