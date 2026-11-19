@@ -118,5 +118,8 @@ process.stdin.on('data', (chunk: Buffer) => {
     }
 });
 process.stdin.on('end', () => {
-    void session?.close().finally(() => process.exit(0)) ?? process.exit(0);
+    if (session)
+        void session.close().finally(() => process.exit(0));
+    else
+        process.exit(0);
 });
