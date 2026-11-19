@@ -56,6 +56,23 @@ The controller creates a Unix-domain socket with mode `0600`, uses a cryptograph
 
 The public GJS extension API does not expose SpiderMonkey's `Debugger` object to extension code. GJS documents `System.breakpoint()` as a native trap intended for an external debugger such as GDB; it is not a remotely controllable DAP breakpoint engine. A genuine debugger therefore requires a supported engine-level bridge in GJS/GNOME Shell.
 
+## Install the VS Code extension
+
+Download `g-os-debug.vsix` from the **VS Code Extension Package** workflow artifact (or from the GitHub Release created for a `v*` tag). In VS Code, open the Extensions view, select the `...` menu, choose **Install from VSIX...**, and select the downloaded file. You can also install it from a terminal with:
+
+```sh
+code --install-extension g-os-debug.vsix
+```
+
+To build the package locally:
+
+```sh
+npm install
+npm run build
+cd packages/vscode-extension
+npx --yes @vscode/vsce package --no-dependencies --out ../../g-os-debug.vsix
+```
+
 ## Development
 
 - `npm test`: build packages and run unit/integration tests.

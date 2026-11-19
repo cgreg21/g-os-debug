@@ -1,0 +1,51 @@
+name: VS Code Extension Package
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    name: Build VSIX
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run tests and build
+        run: npm test
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Package VS Code extension
+        working-directory: packages/vscode-extension
+        run: npx --yes @vscode/vsce package --no-dependencies --out ../../artifacts/g-os-debug.vsix
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: g-os-debug-vsix
+          path: artifacts/g-os-debug.vsix
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${GITHUB_REF_NAME}" artifacts/g-os-debug.vsix --title "G-Os Debug VS Code Extension ${GITHUB_REF_NAME}" --generate-notes
