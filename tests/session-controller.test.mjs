@@ -115,8 +115,7 @@ test('does not remove an existing file at the requested socket path', async () =
 test('supports actor highlight and clear-highlight runtime commands', async () => {
     await withEndpoint(async ({ endpoint, path }) => {
         const result = await handshake(path, { type: 'hello', protocolVersion: 1, adapterVersion: 'test', token: endpoint.token });
-        const events = [];
-        endpoint.onMessage(event => events.push(event));
+        const highlightEvent = new Promise(resolve => endpoint.onMessage(resolve));
 
         endpoint.send({ type: 'highlightActor', id: 21, actorId: 9 });
         let input = '';
@@ -130,13 +129,12 @@ test('supports actor highlight and clear-highlight runtime commands', async () =
         });
         assert.deepEqual(highlightCommand, { type: 'highlightActor', id: 21, actorId: 9 });
         result.socket.write(JSON.stringify({ type: 'highlightResult', id: 21, actorId: 9, success: true }) + '\n');
-        await new Promise(resolve => setImmediate(resolve));
-        assert.deepEqual(events[0], { type: 'highlightResult', id: 21, actorId: 9, success: true });
+        assert.deepEqual(await highlightEvent, { type: 'highlightResult', id: 21, actorId: 9, success: true });
 
+        const clearEvent = new Promise(resolve => endpoint.onMessage(resolve));
         endpoint.send({ type: 'clearHighlight', id: 22 });
         result.socket.write(JSON.stringify({ type: 'highlightResult', id: 22, actorId: null, success: true }) + '\n');
-        await new Promise(resolve => setImmediate(resolve));
-        assert.deepEqual(events[1], { type: 'highlightResult', id: 22, actorId: null, success: true });
+        assert.deepEqual(await clearEvent, { type: 'highlightResult', id: 22, actorId: null, success: true });
         result.socket.destroy();
     });
 });
