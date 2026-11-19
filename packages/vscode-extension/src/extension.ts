@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { homedir } from 'node:os';
 import { createDebugSession, type DebugSession } from '@g-os-debug/session-controller';
 
 interface ActorNode {
@@ -83,7 +84,8 @@ export function activate(context: vscode.ExtensionContext): void {
         starting = true;
         try {
             const config = vscode.workspace.getConfiguration('gOsDebug');
-            const socketPath = config.get<string>('socketPath', '');
+            const configuredSocketPath = config.get<string>('socketPath', '');
+            const socketPath = configuredSocketPath.replace(/^\\$\\{userHome\\}|^~/, homedir());
             const token = config.get<string>('runtimeToken', '');
             const runtimeVersion = config.get<string>('runtimeVersion', '0.1.0');
             if (!socketPath || !/^[a-f0-9]{64}$/i.test(token)) {
@@ -139,7 +141,8 @@ export function activate(context: vscode.ExtensionContext): void {
             channel.appendLine(lines.join('\n'));
             channel.show(true);
             context.subscriptions.push(channel);
-        })
+        }),
+        vscode.commands.registerCommand('gOsDebug.refreshActors', refresh)
     );
     context.subscriptions.push({ dispose: () => { void stop(); } });
     void start();
