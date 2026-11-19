@@ -30,7 +30,7 @@ A separate GJS process cannot inspect the JavaScript heap or execution context o
 
 The controller creates a Unix-domain socket with mode `0600`, generates a cryptographically random 256-bit session token, enforces a 16 KiB handshake limit and rejects token or protocol-version mismatches. No TCP listener is opened. The GJS runtime uses Gio asynchronous APIs and must be loaded in the extension's own Shell context.
 
-The runtime currently establishes transport and responds to heartbeat requests. It does **not** yet inspect extension objects, pause JavaScript, implement breakpoints, expose scopes or variables, or provide stepping.
+The runtime currently establishes transport and responds to heartbeat requests. The session controller can send ping/shutdown commands and receive runtime responses through a small event API. It does **not** yet inspect extension objects, pause JavaScript, implement breakpoints, expose scopes or variables, or provide stepping.
 
 ## SpiderMonkey debugging limitation
 
