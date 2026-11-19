@@ -54,7 +54,8 @@ test('adapter exposes a real runtime stage snapshot through its custom DAP reque
     let runtime;
     try {
         adapter.send(1, 'gOs/sessionStatus');
-        await new Promise(resolve => setTimeout(resolve, 30));
+        const initialStatus = await adapter.waitFor(m => m.type === 'response' && m.request_seq === 1);
+        assert.equal(initialStatus.body.state, 'waiting');
         runtime = connect(socketPath);
         runtime.setEncoding('utf8');
         let input = '';
