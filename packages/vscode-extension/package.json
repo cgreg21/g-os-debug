@@ -73,11 +73,6 @@
           "command": "gOsDebug.highlightActor",
           "when": "view == gOsActors && viewItem == gOsActor",
           "group": "inline"
-        },
-        {
-          "command": "gOsDebug.highlightActor",
-          "when": "view == gOsActors && viewItem == gOsActor",
-          "group": "navigation"
         }
       ]
     },
